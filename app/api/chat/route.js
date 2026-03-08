@@ -1,23 +1,15 @@
-import Anthropic from "@anthropic-ai/sdk"
-
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-
-const SALES_SYSTEM_PROMPT = `?????????????????? AI ???????? ??? ???????????.
-??????: ?????????, ?????????????, ????????, ?????????????.
-??????? ???????? ??????? ??? emoji ????????.
-[???: ????????????????????????????????]`
-
+import { GoogleGenerativeAI } from "@google/generative-ai"
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
+const PROMPT = "You are a professional AI sales assistant. Greet customers, present products, answer questions, and close sales. Reply short and friendly with emoji. Reply in the same language as the customer (Lao, Thai, or English)."
 export async function POST(request) {
   try {
     const { messages } = await request.json()
-    const response = await client.messages.create({
-      model: "claude-opus-4-5-20251101",
-      max_tokens: 1024,
-      system: SALES_SYSTEM_PROMPT,
-      messages: messages.filter(m => m.role === "user" || m.role === "assistant"),
-    })
-    return Response.json({ reply: response.content[0]?.text || "?????, ??????." })
-  } catch (e) {
-    return Response.json({ error: "Server error" }, { status: 500 })
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash", systemInstruction: PROMPT })
+    const history = messages.slice(0,-1).map(m => ({ role: m.role==="assistant"?"model":"user", parts:[{text:m.content}] }))
+    const chat = model.startChat({ history })
+    const result = await chat.sendMessage(messages[messages.length-1].content)
+    return Response.json({ reply: result.response.text() })
+  } catch(e) {
+    return Response.json({ error: e.message }, { status: 500 })
   }
 }
